@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PTransX Customer</title>
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/main.css" rel="stylesheet">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <header>
+      <div id="logo"><a href="http://www.yungching.com.tw/"></a></div>
+    </header>
+    <div id="main">
+      <aside>
+        <section>
+          Status
+          <span class="label label-success">Ready</span>
+          <span class="label label-danger">offline</span>
+          <div style='margin-top:20px;'>
+            <input id="input-2" type="file" class="file" >
+          </div>
+        </section>
+        <footer>
+          <video id="myCamera" name="myCamera" width="150" height="117">Customer Camera Screen</viede>
+        </footer>
+      </aside>
+      <section id="mainVideo">
+        <video id="AgentCamera" name="AgentCamera" width="800" height="600">Agent Camera Screen</video>
+        <button class="btn btn-primary btn-lg" id="startSession" type="button">Start Session</button>
+      </section>
+    </div>
+    <footer>
+      
+    </footer>
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="js/bootstrap.min.js"></script>
+    <script src="https://cdn.socket.io/socket.io-1.0.6.js"></script>
+    <script src='js/lib/adapter.js'></script>
+    <script type="text/javascript">
+
+      $.urlParam = function(name){
+        var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+        if (results==null){
+          return null;
+        } else { 
+          return results[1] || 0;
+        }
+      }
+
+
+      var sessionId;
+      var socket = io.connect();
+      var pc;
+
+
+      function onReceiveAnswer(sessionDescription) {
+        console.log("onReceiveAnswer :" + JSON.stringify(sessionDescription));
+        pc.setRemoteDescription(
+          new RTCSessionDescription(sessionDescription),
+          function() {
+            console.log("setRemoteDescription OK.");
+          },
+          function() {
+            console.log("Failed to setRemoteDescription");
+          }
+        );
+      }
+
+
+      function onSessionConnecting() {
+        console.log("onSessionConnecting");
+      }
+
+      function onSessionOpened() {
+        console.log('onSessionOpend');
+      }
+
+      function onRemoteStreamAdded(evt) {
+        console.log("onRemoteStreamAdded");
+        //pc.addStream(evt);
+        var video = document.getElementById('AgentCamera');
+        var vendorURL = window.URL || window.webkitURL;
+        video.src = window.URL.createObjectURL(evt.stream);
+        video.play();
+      }
+
+      function onRemoteStreamRemoved(evt) {
+        console.log("onRemoteStreamRemoved");
+      }
+
+      function onIceCandidate(evt) {
+        if (evt.candidate) {
+      
+          pc.addIceCandidate(new RTCIceCandidate(evt.candidate));
+          // notify remote peer
+          socket.emit('candidate', {
+            sessionId : sessionId,
+            candidate : evt.candidate
+          });
+        }
+        
+      }
+
+      function startSession() {
+        socket.emit('create or join', sessionId);
+        var constraints = {video:true, audio:false};
+        getUserMedia(
+          constraints,
+          function(stream){
+            console.log(stream);
+            var video = document.getElementById('myCamera');
+            var vendorURL = window.URL || window.webkitURL;
+            video.src = window.URL.createObjectURL(stream);
+            video.play();
+
+            iceServers = {'iceServers': [{'url': 'stun:stun.l.google.com:19302'}]};
+            // create pc1
+            pc = new RTCPeerConnection(iceServers);
+            pc.addStream(stream);
+            pc.onconnecting = onSessionConnecting;
+            pc.onopen = onSessionOpened;
+            pc.onaddstream = onRemoteStreamAdded;
+            pc.onremovestream = onRemoteStreamRemoved;
+            pc.onicecandidate = onIceCandidate;
+            pc.createOffer(
+              function(desc){
+                pc.setLocalDescription(desc, function() {
+                  //console.log("Type:" + desc.type);
+                  //console.log("SDP:" + desc.sdp);
+                  socket.emit('offer', {
+                    sessionDescription : desc,
+                    sessionId : sessionId
+                  });
+                  //console.log("send the offer to a server that can negotiate with a remote client")
+                });
+            });
+          },
+          function(err) {
+            console.log(err);
+            alert(err);
+          }
+        );
+      }
+
+      $(document).ready(function(){
+        sessionId = $.urlParam('r');
+        console.log("sessionId:" + sessionId);
+
+        socket.on('answer', onReceiveAnswer);
+
+        socket.on('candidate', function(candidate) {
+          pc.addIceCandidate(
+            new RTCIceCandidate(candidate),
+            function () {
+              console.log("Add Remoto Ice Candidate OK.");
+            },
+            function () {
+              console.log("Failed to Add Remove Ice Candidate.");
+            }
+          );
+        });
+
+        $("#startSession").click(function(){
+          startSession();
+
+        });
+
+
+      });
+
+
+
+
+
+    </script>
+
+  </body>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</html>

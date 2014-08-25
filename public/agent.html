@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PTransX Agent</title>
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/main.css" rel="stylesheet">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <header>
+      <div id="logo"><a href="http://www.yungching.com.tw/"></a></div>
+    </header>
+    <div id="main">
+
+      <aside>
+        <section>
+          Status
+          <span class="label label-success">Ready</span>
+          <span class="label label-danger">offline</span>
+
+          <button class="btn btn-primary btn-lg" id="startButton" type="button">Start Session</button>
+          
+        </section>
+        <footer>
+          <video id="myCamera" name="myCamera" width="150" height="117"></viede>
+        </footer>
+      </aside>
+      <section id="mainVideo">
+        <video id="AgentCamera" name="AgentCamera" width="400" height="300"></video>
+        <div id="shareDoc"></div>
+      </section>
+    </div>
+    <footer>
+      
+    </footer>
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="js/bootstrap.min.js"></script>
+    <script src='js/lib/adapter.js'></script>
+    <script type="js/url.min.js"></script>
+    <script src="https://cdn.socket.io/socket.io-1.0.6.js"></script>
+  </body>
+
+  <script type="text/javascript">
+    var isSessionStarted = false;
+    var socket;
+    var roomId;
+    var sessionId;
+    var peerConnection;
+
+    $.urlParam = function(name){
+      var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+      if (results==null){
+       return null;
+      }
+      else{
+       return results[1] || 0;
+      }
+    }
+
+    function onSessionConnecting() {
+        console.log("onSessionConnecting");
+    }
+
+    function onSessionOpened() {
+        console.log('onSessionOpend');
+    }
+
+    function onRemoteStreamAdded(evt) {
+      console.log("onRemoteStreamAdded");
+      var video = document.getElementById('myCamera');
+      attachMediaStream(video, evt.stream);
+      
+      /*
+      var vendorURL = window.URL || window.webkitURL;
+      video.src = window.URL.createObjectURL(evt.stream);
+      video.play();
+      */
+    }
+
+    function onRemoteStreamRemoved(evt) {
+      console.log("onRemoteStreamRemoved");
+    }
+
+    function onIceCandidate(evt) {
+      console.log("onIceCandidate");
+      if (evt.candidate) {
+        addIceCandidate(new RTCIceCandidate(evt.candidate));
+        // notify remote peer
+        socket.emit('candidate', {
+          sessionId : sessionId,
+          candidate : evt.candidate
+        });
+      }
+    }
+
+    function addIceCandidate(candidate) {
+      peerConnection.addIceCandidate(
+        candidate,
+        function() {
+          console.log("Add Ice Candidate OK");
+        },
+        function () {
+          console.log("Failed to Add Ice Candidate");
+        }
+      );
+    }
+
+    function createAnswer() {
+      console.log("create the answer");
+      peerConnection.createAnswer(function(sessionDescription) {
+        peerConnection.setLocalDescription(sessionDescription);
+        socket.emit('answer', {
+          sessionId : sessionId,
+          sessionDescription : sessionDescription 
+        });
+      });
+    }
+
+    function onReceiveOffer(sessionDescription) {
+      //var message = JSON.parse(sessionDescription.data);
+      //console.log(message);
+      //console.log("onReceiveOffer:" + JSON.stringify(sessionDescription));
+      peerConnection.setRemoteDescription(
+        new RTCSessionDescription(sessionDescription),
+        function () {
+          //console.log("KKK");
+          //console.log("peerConnection.remoteDescription.type:" + peerConnection.remoteDescription.type);
+          // if we received an offer, we need to answer
+          if (peerConnection.remoteDescription.type == "offer") {
+            
+            createAnswer();
+            //peerConnection.createAnswer(localDescCreated, logError);
+          }
+        },
+        function () {
+          console.log("Error");
+        }
+      );
+    }
+
+
+    $(document).ready(function(){
+      roomId = $.urlParam('r');
+      sessionId = $.urlParam('r');
+      
+      socket = io.connect();
+      socket.on('offer', onReceiveOffer);
+      socket.on('candidate', function(candidate) {
+        addIceCandidate(new RTCIceCandidate(candidate));
+      });
+
+
+      iceServers = {'iceServers': [{'url': 'stun:stun.l.google.com:19302'}]};
+      peerConnection = new RTCPeerConnection(iceServers);
+      //peerConnection.addStream(stream);
+      peerConnection.onconnecting = onSessionConnecting;
+      peerConnection.onopen = onSessionOpened;
+      peerConnection.onaddstream = onRemoteStreamAdded;
+      peerConnection.onremovestream = onRemoteStreamRemoved;
+      peerConnection.onicecandidate = onIceCandidate;
+
+      
+      $("#startButton").click(function(){
+        
+        if (isSessionStarted == false) {
+          startSession();  
+          $(this).text('Stop Session');
+        } else {
+          stopSession();
+          $(this).text('Start Session');
+        }
+      });
+
+
+    });
+
+    function stopSession() {
+      if (isSessionStarted) {
+        var video = document.getElementById('AgentCamera');
+        video.src = null;  
+        isSessionStarted = false;
+      }
+    }
+
+    function startSession() {
+      var constraints = {video:true, audio:false};
+      getUserMedia(
+        constraints,
+        function(stream){
+          console.log(stream);
+
+
+          var video = document.getElementById('AgentCamera');
+          //attachMediaStream(video, stream);
+          
+          //var vendorURL = window.URL || window.webkitURL;
+          video.src = window.URL.createObjectURL(stream);
+          video.play();
+          
+          peerConnection.addStream(stream);
+          isSessionStarted = true;
+          //regiest a ready session.
+          socket.emit('create or join', roomId); 
+      },
+      function(err) {
+        console.log(err);
+        alert(err);
+      }
+    );
+  }
+
+    
+
+
+  </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</html>

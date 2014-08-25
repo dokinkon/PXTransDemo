@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>WebRTC client</title>
+		<style type="text/css">
+			* {margin: 0; padding: 0;}
+			#container {height: 100%; width:100%; font-size: 0;}
+			#left, #middle, #right {display: inline-block; *display: inline; zoom: 1; vertical-align: top; font-size: 12px;}
+			#left {width: 20%; background: blue;}
+			#middle {width: 40%; height:100%;background: green;}
+			#right {width: 40%; height:100%;background: yellow;}
+		</style>
+	</head>
+	<body>
+		
+		
+		<div id="container">
+			<div id="header" style="background-color:#FFA500;">
+				<h1 style="margin-bottom:0;">Main Title of Web Page</h1>
+			</div>
+
+			<div id="left">
+				<textarea id="textarea"></textarea>
+			</div>
+			<div id="middle">
+				<h3>local</h3>
+				<video id='local-video'></video>
+				<button id='start-button'>Start</button>
+				<button id='call-button'>Call</button>
+				<button id='hang-button'>Hang</button>
+			</div>
+			<div id="right">
+				<h3>remote</h3>
+				<video id='remote-video'></video>
+			</div>
+
+			
+
+		</div>
+		
+	</body>
+
+	<script src='/socket.io/socket.io.js'></script>
+	<script src='js/lib/adapter.js'></script>
+	<script type="text/javascript">
+
+	var pc;
+
+
+	function startLocalVidio() {
+		var constraints = {video:true};
+		getUserMedia(
+			constraints,
+			function(stream){
+				console.log(stream);
+				var video = document.getElementById('local-video');
+				var vendorURL = window.URL || window.webkitURL;
+				video.src = window.URL.createObjectURL(stream);
+				video.play();
+
+
+				//var video = document.getElementById('remote-video');
+				//video.src = window.URL.createObjectURL(stream);
+				//video.play();
+
+			},
+			function(err) {
+				console.log(err);
+				alert(err);
+			}
+		);
+	}
+
+	function onOfferCreated(description) {
+		pc.setLocalDescription(description, null, null);
+	}
+
+	function onError(err) {
+		alert(err);
+	}
+
+	function call() {
+		console.log("Call....");
+		try {
+			var who = prompt("Dial to");
+
+			pc = new RTCPeerConnection({'iceServers': [{'url': 'stun:stun.l.google.com:19302'}]});
+			pc.onicecandidate = function(evt) {
+				// send any ice candidates to the other peer
+				// TODO...
+				console.log('handleIceCandidate event: ', evt);
+  				if (evt.candidate) {
+  					socket.emit('message', {
+  						type: 'candidate',
+  						label : evt.candidate.sdpMLineIndex,
+  						id: evt.candidate.sdpMid,
+  						candidate : evt.candidate.candidate
+  					});
+  				} else {
+    				console.log('End of candidates.');
+  				}
+			}
+			pc.createOffer(onOfferCreated, onError);
+
+
+		} catch (e) {
+			console.log(e);
+		}
+		
+	}
+
+	function onClientsUpdated(clients) {
+		console.log("onClientsUpdated");
+		/*
+		for (var i=0;i<clients.length;i++) {
+			console.log(clients[i]);
+		}*/
+	}
+
+	function hang() {
+		var video = document.getElementById('local-video');
+		video.src = null;
+	}
+
+	function handleMessage(message) {
+		console.log('Client received message:', message);
+  		if (message === 'got user media') {
+  			//maybeStart();
+  		} else if (message.type === 'offer') {
+    		/*
+    		if (!isInitiator && !isStarted) {
+      			maybeStart();
+    		}
+    		pc.setRemoteDescription(new RTCSessionDescription(message));
+    		doAnswer();
+    		*/
+  		} else if (message.type === 'answer' /* && isStarted */) {
+    		//pc.setRemoteDescription(new RTCSessionDescription(message));
+  		} else if (message.type === 'candidate' /* && isStarted */) {
+    		var candidate = new RTCIceCandidate({
+      			sdpMLineIndex: message.label,
+      			candidate: message.candidate
+    		});
+    		pc.addIceCandidate(candidate);
+  		} else if (message === 'bye' && isStarted) {
+    		//handleRemoteHangup();
+  		}
+
+	}
+
+	var socket;
+
+
+	window.onload = function () {
+			var startButton = document.getElementById('start-button');
+			startButton.onclick = startLocalVidio;
+
+			var hangButton = document.getElementById('hang-button');
+			hangButton.onclick = hang;
+
+			var callButton = document.getElementById('call-button');
+			callButton.onclick = call;
+
+			console.log(window.location);
+
+			var location = window.location;
+			var roomId = location.pathname.replace('/', "");
+			console.log("roomId:" + roomId);
+
+				
+
+
+			
+
+			socket.on('log', function (array){
+  				console.log.apply(console, array);
+			});
+
+			socket.on('created', function (room){
+  				console.log('Created room ' + room);
+  				//isInitiator = true;
+			});
+
+			socket.on('join', function (room){
+  				console.log('Another peer made a request to join room ' + room);
+  				console.log('This peer is the initiator of room ' + room + '!');
+  				//isChannelReady = true;
+			});
+
+			socket.on('client online', function(name) {
+				console.log('client online' + name);
+				var textArea = document.getElementById('textarea');
+				textArea.value += name + 'is online';
+				textArea.value += '\n';
+			});
+
+			socket.on('joined', function (room){
+  				console.log('This peer has joined room ' + room);
+  				//isChannelReady = true;
+			});
+
+			socket.on('full', function(room) {
+				alert("This room:" + room + " is full!");
+			});
+
+			socket.on('message', handleMessage);
+			socket.on('client updated', onClientsUpdated);
+
+
+
+			//socket.emit('create or join', roomId);
+			var nickname = prompt("Please enter nickname");
+			socket.emit('nickname', nickname);
+	}
+	</script>
+
+</html>
