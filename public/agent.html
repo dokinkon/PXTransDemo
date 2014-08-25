@@ -17,6 +17,7 @@
     <![endif]-->
   </head>
   <body>
+
     <header>
       <div id="logo"><a href="http://www.yungching.com.tw/"></a></div>
     </header>
@@ -32,17 +33,18 @@
           
         </section>
         <footer>
-          <video id="myCamera" name="myCamera" width="150" height="117"></viede>
+          <video id="myCamera" name="myCamera" width="150" height="117" autoplay></viede>
         </footer>
       </aside>
       <section id="mainVideo">
-        <video id="AgentCamera" name="AgentCamera" width="400" height="300"></video>
+        <video id="AgentCamera" name="AgentCamera" width="800" height="600" autoplay></video>
         <div id="shareDoc"></div>
       </section>
     </div>
     <footer>
       
     </footer>
+    
     <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <!-- Include all compiled plugins (below), or include individual files as needed -->
@@ -80,13 +82,13 @@
     function onRemoteStreamAdded(evt) {
       console.log("onRemoteStreamAdded");
       var video = document.getElementById('myCamera');
-      attachMediaStream(video, evt.stream);
-      
-      /*
-      var vendorURL = window.URL || window.webkitURL;
+      //attachMediaStream(video, evt.stream);
+      //var vendorURL = window.URL || window.webkitURL;
       video.src = window.URL.createObjectURL(evt.stream);
       video.play();
-      */
+      
+
+      
     }
 
     function onRemoteStreamRemoved(evt) {
@@ -182,8 +184,6 @@
           $(this).text('Start Session');
         }
       });
-
-
     });
 
     function stopSession() {
@@ -203,12 +203,9 @@
 
 
           var video = document.getElementById('AgentCamera');
-          //attachMediaStream(video, stream);
+          attachMediaStream(video, stream);
           
-          //var vendorURL = window.URL || window.webkitURL;
-          video.src = window.URL.createObjectURL(stream);
-          video.play();
-          
+        
           peerConnection.addStream(stream);
           isSessionStarted = true;
           //regiest a ready session.
