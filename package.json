@@ -1,11 +1,19 @@
 {
-  "name": "socket-chat-example",
+  "name": "PXTransDemo",
   "version": "0.0.1",
-  "description": "my first socketio",
+  "description": "PXTransDemo",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+
   "dependencies": {
     "socket.io": "~1.0.6",
     "node-static": "~0.7.4",
     "express" : "~3.2.5",
-    "dict" : "1.4.0"
+    "dict" : "1.4.0",
+    "daemon" : "~1.1.0"
+
   }
 }
